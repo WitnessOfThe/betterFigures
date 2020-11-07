@@ -36,6 +36,7 @@ classdef proPlot
             if(nargin<3)
                 z=[];
             end
+            [x, y, z, varargin] = checkXYZ(x, y, z, varargin{:});
 
             if(numel(varargin)>0)
                 if(strcmpi(varargin{1}, "PlotType"))
@@ -147,6 +148,7 @@ classdef proPlot
            if(nargin<4)
                z=[];
            end
+            [x, y, z, varargin] = checkXYZ(x, y, z, varargin{:});
            
            newData = obj.dataOptions;
            
@@ -213,8 +215,8 @@ classdef proPlot
                      % we don't want to change the options of the one
                      % before
                if( isfield(obj.data{ind},'DownSample2DPlot') && any(strcmpi(PlotType, ["pcolor", "surf"])) )
-                   downSampleX = 1:floor(numel(obj.data{ind}.x)/obj.data{ind}.DownSample2DPlot):numel(obj.data{ind}.x);
-                   downSampleY = 1:floor(numel(obj.data{ind}.y)/obj.data{ind}.DownSample2DPlot):numel(obj.data{ind}.y);
+                   downSampleX = 1:max(floor(numel(obj.data{ind}.x)/obj.data{ind}.DownSample2DPlot(1)), 1):numel(obj.data{ind}.x);
+                   downSampleY = 1:max(floor(numel(obj.data{ind}.y)/obj.data{ind}.DownSample2DPlot(2)), 1):numel(obj.data{ind}.y);
                else
                    downSampleX = 1:numel(obj.data{ind}.x);
                    downSampleY = 1:numel(obj.data{ind}.y);
@@ -247,17 +249,21 @@ classdef proPlot
                         p=annotation(annType, axis2FigRelativePos(obj.data{ind}.x ), 'String', obj.data{ind}.String, 'Interpreter', obj.figOptions.LabelInterpreter);
                    elseif(any(strcmpi(annType, ["line", "arrow", "doublearrow"])))
                        % x and y are beginign/end coords for lines
-                       [X, Y] = axis2FigRelativeXY(obj.data{ind}.x, obj.data{ind}.y);
+                       [X, Y] = axis2FigRelativeXY(obj.data{ind}.x, obj.data{ind}.y, [], obj.(strcat('axis',num2str(obj.data{ind}.Axis)) ) );
                         p=annotation(annType, X, Y);
                    elseif(strcmpi(annType, "textarrow"))
                        % x and y are beginign/end coords for lines
-                       [X, Y] = axis2FigRelativeXY(obj.data{ind}.x, obj.data{ind}.y);
+                       [X, Y] = axis2FigRelativeXY(obj.data{ind}.x, obj.data{ind}.y, [], obj.(strcat('axis',num2str(obj.data{ind}.Axis)) ) );
                         p=annotation(annType, X, Y, 'String', obj.data{ind}.String, 'Interpreter', obj.figOptions.LabelInterpreter);
                    end
                elseif(strcmpi(PlotType, "image"))
-                   [imageData,cm]=imread(obj.data{ind}.ImageFile);
-                    p=image(flipud(imageData));
-                    colormap(cm);
+                   if( numel(obj.data{ind}.x)>0)
+                        p=image(flipud(obj.data{ind}.x));
+                   else 
+                        [imageData,cm]=imread(obj.data{ind}.ImageFile);
+                        p=image(flipud(imageData));
+                        colormap(cm);
+                   end
                     axis image
                else
                    % Plotting for any other plotType not explicitly given
@@ -274,7 +280,9 @@ classdef proPlot
                            p = fh(obj.data{ind}.x);
                        end
                    catch e
-                       warning(e.identifier, '%s', e.message);
+                       if(~strcmp(PlotType, "Annotation") )
+                            warning(e.identifier, '%s', e.message);
+                       end
                    end
                    
                end
@@ -359,6 +367,7 @@ classdef proPlot
                 end
             end
             
+            
             % set a few options specificially to also set the interpreter.
             if( isfield( options_, 'Interpreter' ) )
                 Interpreter_ = options_.Interpreter;
@@ -370,7 +379,12 @@ classdef proPlot
                 title(ax,options_.TitleText, 'Interpreter', Interpreter_);
             end
             if( isfield( options_, 'LegendLabels' ) )
-                legend(ax,options_.LegendLabels, 'Interpreter', Interpreter_);
+                %Only set the legends if all the data is plotted otherwise
+                %a warning message is displayed
+                n_plotted = numel(get(ax, 'Children'));
+                if(n_plotted >= numel(obj.data))
+                    legend(ax,options_.LegendLabels, 'Interpreter', Interpreter_);
+                end
             end
             if( isfield( options_, 'XLabelText' ) )
                 xlabel(ax,options_.XLabelText, 'Interpreter', Interpreter_);
@@ -481,9 +495,9 @@ classdef proPlot
             for ind = 1:numel(obj.data)
                 if(strcmpi(obj.data{ind}.PlotType,'Annotation'))
                     
-                    if(obj.InstaPlot)
-                        obj = obj.plotData(ind);
-                    end
+%                     if(obj.InstaPlot)
+                        obj = obj.plotData(ind, false, true);
+%                     end
                 end
             end
         end
@@ -523,6 +537,22 @@ classdef proPlot
     end
 end
 
+function [x, y, z, varargin] = checkXYZ(x, y, z, varargin)
+    % If user doesn't input x y or z and just puts options
+    if( ~isnumeric(z) )
+        varargin = {z, varargin{:}};
+        z=[];
+    end
+    if( ~isnumeric(y) )
+        varargin = {y, varargin{:}};
+        y=[];
+    end
+    if( ~isnumeric(x) )
+        varargin = {x, varargin{:}};
+        x=[];
+    end
+end
+
 function [Pos] = axis2FigRelativePos( Pos, Units)
 % Changes a pos object given relative to axis coordinates to be relative to
 % a figures coordinates. Units are the units of the figure.
@@ -537,14 +567,16 @@ Pos = [Xtmp(1), Ytmp(1), Xtmp(2)-Xtmp(1), Ytmp(2)-Ytmp(1)];
 
 end
 
-function [X, Y] = axis2FigRelativeXY(Xdata, Ydata, units)
+function [X, Y] = axis2FigRelativeXY(Xdata, Ydata, units, ax )
 % Changes X and Y coordinates relative to an axis to be relative to
 % a figures coordinates. Units are the units of the figure.
-if(nargin<3)
+if(nargin<3 || numel(units)==0)
     units="normalized";
 end
+if(nargin<4)
+    ax = gca;
+end
 
-ax=gca;
 oldunits = get(ax, 'Units');
 set(ax, 'Units', units);
 axpos = get(ax,'Position');
