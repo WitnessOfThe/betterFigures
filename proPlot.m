@@ -218,8 +218,8 @@ classdef proPlot
                    downSampleX = 1:max(floor(numel(obj.data{ind}.x)/obj.data{ind}.DownSample2DPlot(1)), 1):numel(obj.data{ind}.x);
                    downSampleY = 1:max(floor(numel(obj.data{ind}.y)/obj.data{ind}.DownSample2DPlot(2)), 1):numel(obj.data{ind}.y);
                else
-                   downSampleX = 1:numel(obj.data{ind}.x);
-                   downSampleY = 1:numel(obj.data{ind}.y);
+                   downSampleX = 1:size((obj.data{ind}.x),2);
+                   downSampleY = 1:size((obj.data{ind}.y),1);
                end
 
                if(strcmpi(PlotType, "line"))
@@ -236,9 +236,9 @@ classdef proPlot
                    end
                    p=fill(obj.data{ind}.x,obj.data{ind}.y, color );
                elseif(strcmpi(PlotType, "pcolor"))
-                   p=pcolor(obj.data{ind}.x(downSampleX),obj.data{ind}.y(downSampleY),obj.data{ind}.z(downSampleY,downSampleX));
+                   p=pcolor(obj.data{ind}.x(downSampleY,downSampleX),obj.data{ind}.y(downSampleY,downSampleX),obj.data{ind}.z(downSampleY,downSampleX));
                elseif(strcmpi(PlotType, "surf"))
-                   p=surf(obj.data{ind}.x(downSampleX),obj.data{ind}.y(downSampleY),obj.data{ind}.z(downSampleY,downSampleX));
+                   p=surf(obj.data{ind}.x(downSampleY,downSampleX),obj.data{ind}.y(downSampleY,downSampleX),obj.data{ind}.z(downSampleY,downSampleX));
                elseif(strcmpi(PlotType, "annotation") && plotAnnotations)
                    annType = obj.data{ind}.AnnotationType;
                    if(any(strcmpi(annType, ["rectangle", "ellipse"])))
